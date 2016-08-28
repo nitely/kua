@@ -1,5 +1,10 @@
 # kua
 
+[![Build Status](https://img.shields.io/travis/nitely/kua.svg?style=flat-square)](https://travis-ci.org/nitely/kua)
+[![Coverage Status](https://img.shields.io/coveralls/nitely/kua.svg?style=flat-square)](https://coveralls.io/r/nitely/kua)
+[![pypi](https://img.shields.io/pypi/v/kua.svg?style=flat-square)](https://pypi.python.org/pypi/kua)
+[![licence](https://img.shields.io/pypi/l/kua.svg?style=flat-square)](https://raw.githubusercontent.com/nitely/kua/master/LICENSE)
+
 Lightning fast URL routing in Python.
 
 kua is a [Trie](https://en.wikipedia.org/wiki/Trie)-like based router.
@@ -36,6 +41,11 @@ route.anything
 ```
 
 
+# Docs
+
+[Read The Docs](http://kua.readthedocs.io)
+
+
 ## Tests
 
 ```
@@ -55,7 +65,7 @@ a variable where there is a static one in a similar pattern.
 
 Here are some examples of good and bad schemas:
 
-```
+```python
 # bad
 routes.add(':var', ...)  # clashes with pretty much every pattern
 

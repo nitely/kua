@@ -51,8 +51,14 @@ class ReactTest(unittest.TestCase):
         """
         self.routes.add(':foo/:bar/:baz', 'foo')
         self.routes.add(':foo/api/:baz', 'bar')
-        _, anything = self.routes.match('foo/bar/baz')
-        _, anything_b = self.routes.match('foo/api/baz')
+        params, anything = self.routes.match('foo/bar/baz')
+        params_b, anything_b = self.routes.match('foo/api/baz')
+        self.assertDictEqual(
+            params,
+            {'foo': 'foo', 'bar': 'bar', 'baz': 'baz'})
+        self.assertDictEqual(
+            params_b,
+            {'foo': 'foo', 'baz': 'baz'})
         self.assertEqual(anything, 'foo')
         self.assertEqual(anything_b, 'bar')
 
@@ -101,11 +107,30 @@ class ReactTest(unittest.TestCase):
             {'foo': 'api'})
         self.assertEqual(anything, 'foo')
 
+    def test_match_clashing_missing_part(self):
+        """
+        Should resolve clashing by doing backtracking
+        """
+        self.routes.add('foo/bar/:baz', 'foo')
+        self.routes.add(':foo/:bar', 'foo')
+        params, anything = self.routes.match('foo/bar')
+        self.assertDictEqual(
+            params,
+            {'foo': 'foo', 'bar': 'bar'})
+        self.assertEqual(anything, 'foo')
+
     def test_match_not_found(self):
         """
         Should raise match error if there is no match
         """
         self.assertRaises(routes.RouteError, self.routes.match, 'foo')
+
+    def test_match_not_found_missing_part(self):
+        """
+        Should raise match error if there is no match
+        """
+        self.routes.add(':foo/:bar/:baz', 'foo')
+        self.assertRaises(routes.RouteError, self.routes.match, 'foo/bar')
 
     def test_match_case_sensitive(self):
         """
@@ -129,3 +154,24 @@ class ReactTest(unittest.TestCase):
         self.assertRaises(routes.RouteError, self.routes.match, 'foo/bar/baz')
         self.routes._max_depth = 10
         self.routes.match('foo/bar/baz')
+
+    def test_normalize_urls(self):
+        """
+        Should not care about leading/trailing slashes
+        """
+        self.routes.add('/foo/bar/baz/', 'foo')
+        route = self.routes.match('foo/bar/baz')
+        self.assertDictEqual(route.params, {})
+        self.assertEqual(route.anything, 'foo')
+
+        route = self.routes.match('/foo/bar/baz/')
+        self.assertDictEqual(route.params, {})
+        self.assertEqual(route.anything, 'foo')
+
+        route = self.routes.match('/foo/bar/baz')
+        self.assertDictEqual(route.params, {})
+        self.assertEqual(route.anything, 'foo')
+
+        route = self.routes.match('foo/bar/baz/')
+        self.assertDictEqual(route.params, {})
+        self.assertEqual(route.anything, 'foo')
