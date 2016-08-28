@@ -41,6 +41,11 @@ route.anything
 ```
 
 
+# Docs
+
+[Read The Docs](http://kua.readthedocs.io)
+
+
 ## Tests
 
 ```
