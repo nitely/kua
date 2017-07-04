@@ -45,6 +45,31 @@ def normalize_url(url):
     return url
 
 
+def _unwrap(variable_parts):
+    """
+    Yield URL parts. The given parts are usually in reverse order.
+    """
+    curr_parts = variable_parts
+    var_any = []
+
+    while curr_parts:
+        curr_parts, (var_type, part) = curr_parts
+
+        if var_type == ':*var':
+            var_any.append(part)
+            continue
+
+        if var_any:
+            yield tuple(reversed(var_any))
+            var_any.clear()
+            continue
+
+        yield part
+
+    if var_any:
+        yield tuple(reversed(var_any))
+
+
 def make_params(key_parts, variable_parts):
     """
     Map keys to variables. This map\
@@ -52,16 +77,18 @@ def make_params(key_parts, variable_parts):
     a URL related parts
 
     :param tuple key_parts: A list of URL parts
-    :param tuple variable_parts: A list of URL parts
+    :param tuple variable_parts: A linked-list\
+    (ala nested tuples) of URL parts
     :return: The param dict with the values\
     assigned to the keys
     :rtype: dict
 
     :private:
     """
-    assert len(key_parts) == len(variable_parts)
-
-    return dict(zip(key_parts, variable_parts))
+    # The unwrapped variable parts are in reverse order.
+    # Instead of reversing those we reverse the key parts
+    # and avoid the O(n) space required for reversing the vars
+    return dict(zip(reversed(key_parts), _unwrap(variable_parts)))
 
 
 _Route = collections.namedtuple(
@@ -104,6 +131,7 @@ class Routes:
     """
 
     _VAR_NODE = ':var'
+    _VAR_ANY_NODE = ':*var'
     _ROUTE_NODE = ':route'
 
     def __init__(self):
@@ -151,9 +179,8 @@ class Routes:
         :private:
         """
         parts = url.split('/', self._max_depth + 1)
-        total_depth = depth_of(parts)
 
-        if total_depth > self._max_depth:
+        if depth_of(parts) > self._max_depth:
             raise RouteError('No match')
 
         return parts
@@ -162,14 +189,13 @@ class Routes:
         """
         Match URL parts to a registered pattern.
 
-        Return `None` if there is no match.
-
         This function is basically where all\
         the CPU-heavy work is done.
 
         :param list parts: URL parts
         :return: Matched route
-        :rtype: :py:class:`.RouteResolved` or None
+        :rtype: :py:class:`.RouteResolved`
+        :raises kua.routes.RouteError: If there is no match
 
         :private:
         """
@@ -197,7 +223,20 @@ class Routes:
             if self._VAR_NODE in curr:
                 to_visit.append((
                     curr[self._VAR_NODE],
-                    (*curr_variable_parts, part),
+                    (curr_variable_parts,
+                     (self._VAR_NODE, part)),
+                    depth + 1))
+
+            if self._VAR_ANY_NODE in curr:
+                to_visit.append((
+                    {self._VAR_ANY_NODE: curr[self._VAR_ANY_NODE]},
+                    (curr_variable_parts,
+                     (self._VAR_ANY_NODE, part)),
+                    depth + 1))
+                to_visit.append((
+                    curr[self._VAR_ANY_NODE],
+                    (curr_variable_parts,
+                     (self._VAR_ANY_NODE, part)),
                     depth + 1))
 
             if part in curr:
@@ -207,13 +246,13 @@ class Routes:
                     depth + 1))
 
         if not route_match:
-            return None
-        else:
-            return RouteResolved(
-                params=make_params(
-                    key_parts=route_match.key_parts,
-                    variable_parts=route_variable_parts),
-                anything=route_match.anything)
+            raise RouteError('No match')
+
+        return RouteResolved(
+            params=make_params(
+                key_parts=route_match.key_parts,
+                variable_parts=route_variable_parts),
+            anything=route_match.anything)
 
     def match(self, url):
         """
@@ -226,12 +265,7 @@ class Routes:
         """
         url = normalize_url(url)
         parts = self._deconstruct_url(url)
-        route = self._match(parts)
-
-        if not route:
-            raise RouteError('No match')
-
-        return route
+        return self._match(parts)
 
     def add(self, url, anything):
         """
@@ -254,8 +288,12 @@ class Routes:
         curr_partial_routes = self._routes
         curr_key_parts = []
 
-        for depth, part in enumerate(parts):
-            if part.startswith(':'):
+        for part in parts:
+            if part.startswith(':*'):
+                curr_key_parts.append(part[2:])
+                part = self._VAR_ANY_NODE
+
+            elif part.startswith(':'):
                 curr_key_parts.append(part[1:])
                 part = self._VAR_NODE
 

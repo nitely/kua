@@ -175,3 +175,50 @@ class ReactTest(unittest.TestCase):
         route = self.routes.match('foo/bar/baz/')
         self.assertDictEqual(route.params, {})
         self.assertEqual(route.anything, 'foo')
+
+    def test_match_var_any(self):
+        """
+        Should match unknown number of URL parts
+        """
+        self.routes._max_depth = 10
+
+        self.routes.add(':*path', 'foo')
+        self.routes.add('static/:*path', 'bar')
+        self.routes.add('static/:*path/sub-path', 'baz')
+        self.routes.add('static/:*path/sub-path/:file_name', 'qux')
+
+        route = self.routes.match('foo/bar/baz')
+        self.assertDictEqual(route.params, {'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'foo')
+
+        route = self.routes.match('static/foo/bar/baz')
+        self.assertDictEqual(route.params, {'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'bar')
+
+        route = self.routes.match('static/foo/bar/baz/sub-path')
+        self.assertDictEqual(route.params, {'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'baz')
+
+        route = self.routes.match('static/foo/bar/baz/sub-path/catz.jpg')
+        self.assertDictEqual(route.params, {
+            'file_name': 'catz.jpg',
+            'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'qux')
+
+    def test_match_var_any_many(self):
+        """
+        Should match multiple any vars
+        """
+        self.routes._max_depth = 10
+
+        self.routes.add(':*path/:*path_a/:*patch_b', 'foo')
+        route = self.routes.match('foo/bar/baz')
+        self.assertDictEqual(route.params, {'patch_b': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'foo')
+
+    def test_match_var_any_precedence(self):
+        """
+        
+        """
+        self.routes._max_depth = 10
+
