@@ -208,8 +208,9 @@ class KuaTest(unittest.TestCase):
         Should match multiple any vars
         """
         self.routes.add(':*path/:*path_a/:*patch_b', 'foo')
-        route = self.routes.match('foo/bar/baz')
-        self.assertDictEqual(route.params, {'patch_b': ('foo', 'bar', 'baz')})
+        route = self.routes.match('foo/bar/baz/qux')
+        self.assertDictEqual(route.params, {
+            'patch_b': ('baz', 'qux'), 'path': ('foo',), 'path_a': ('bar',)})
         self.assertEqual(route.anything, 'foo')
 
     def test_match_var_any_precedence(self):

@@ -67,10 +67,18 @@ def _unwrap(variable_parts: VariablePartsType):
             var_any.append(part)
             continue
 
+        if var_type == Routes._VAR_ANY_BREAK:
+            if var_any:
+                yield tuple(reversed(var_any))
+                var_any.clear()
+
+            var_any.append(part)
+            continue
+
         if var_any:
             yield tuple(reversed(var_any))
-            yield part
             var_any.clear()
+            yield part
             continue
 
         yield part
@@ -169,6 +177,8 @@ class Routes:
     _VAR_ANY_NODE = ':*var'
     _ROUTE_NODE = ':route'
 
+    _VAR_ANY_BREAK = ':*break'
+
     def __init__(self, max_depth: int=40) -> None:
         """
         :ivar _routes: \
@@ -264,7 +274,7 @@ class Routes:
                 to_visit.append((
                     curr[self._VAR_ANY_NODE],
                     (curr_variable_parts,
-                     (self._VAR_ANY_NODE, part)),
+                     (self._VAR_ANY_BREAK, part)),
                     depth + 1))
 
             if self._VAR_NODE in curr:
