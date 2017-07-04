@@ -39,6 +39,8 @@ route.anything
 # {'GET': my_get_controller}
 ```
 
+-> [More](http://kua.readthedocs.io/en/latest/api.html#kua.routes.Routes)
+
 
 # Docs
 
