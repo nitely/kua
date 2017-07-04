@@ -28,12 +28,11 @@ $ pip install kua
 ## Usage
 
 ```python
-from kua import routes
+import kua
 
-
-routes_ = routes.Routes()
-routes_.add('api/:foo', {'GET': my_get_controller})
-route = routes_.match('api/hello-world')
+routes = kua.Routes()
+routes.add('api/:foo', {'GET': my_get_controller})
+route = routes.match('api/hello-world')
 route.params
 # {'foo': 'hello-world'}
 route.anything
