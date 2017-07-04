@@ -55,14 +55,13 @@ def _unwrap(variable_parts):
     while curr_parts:
         curr_parts, (var_type, part) = curr_parts
 
-        if var_type == ':*var':
+        if var_type == Routes._VAR_ANY_NODE:
             var_any.append(part)
             continue
 
         if var_any:
             yield tuple(reversed(var_any))
             var_any.clear()
-            continue
 
         yield part
 
@@ -118,15 +117,35 @@ class Routes:
     Thread safety: adding routes is not thread-safe,\
     it should be done on import time, everything else is.
 
+    URL matcher supports ``:var`` for matching dynamic\
+    path parts and ``:*var`` for matching one or more parts.
+
+    Path parts are matched in the following order: ``static > var > any-var``.
+
     Usage::
 
-        routes_ = routes.Routes()
-        routes_.add('api/:foo', {'GET': my_get_controller})
-        route = routes_.match('api/hello-world')
+        routes = kua.Routes()
+        routes.add('api/:foo', {'GET': my_get_controller})
+        route = routes.match('api/hello-world')
         route.params
         # {'foo': 'hello-world'}
         route.anything
         # {'GET': my_get_controller}
+
+        # Matching any path
+        routes.add('assets/:*foo', {})
+        route = routes.match('assets/user/profile/avatar.jpg')
+        route.params
+        # {'foo': ('user', 'profile', 'avatar.jpg')}
+
+        # Error handling
+        try:
+            route = routes.match('bad-url/some')
+        except kua.RouteError:
+            raise ValueError('Not found 404')
+        else:
+            # Do something useful here
+            pass
 
     """
 
@@ -220,13 +239,6 @@ class Routes:
                 else:
                     continue
 
-            if self._VAR_NODE in curr:
-                to_visit.append((
-                    curr[self._VAR_NODE],
-                    (curr_variable_parts,
-                     (self._VAR_NODE, part)),
-                    depth + 1))
-
             if self._VAR_ANY_NODE in curr:
                 to_visit.append((
                     {self._VAR_ANY_NODE: curr[self._VAR_ANY_NODE]},
@@ -237,6 +249,13 @@ class Routes:
                     curr[self._VAR_ANY_NODE],
                     (curr_variable_parts,
                      (self._VAR_ANY_NODE, part)),
+                    depth + 1))
+
+            if self._VAR_NODE in curr:
+                to_visit.append((
+                    curr[self._VAR_NODE],
+                    (curr_variable_parts,
+                     (self._VAR_NODE, part)),
                     depth + 1))
 
             if part in curr:
@@ -261,7 +280,7 @@ class Routes:
         :param str url: URL
         :return: Matched route
         :rtype: :py:class:`.RouteResolved`
-        :raises kua.routes.RouteError: If there is no match
+        :raises kua.RouteError: If there is no match
         """
         url = normalize_url(url)
         parts = self._deconstruct_url(url)

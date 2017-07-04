@@ -9,7 +9,7 @@ from kua import routes
 logging.disable(logging.CRITICAL)
 
 
-class ReactTest(unittest.TestCase):
+class KuaTest(unittest.TestCase):
 
     def setUp(self):
         self.routes = routes.Routes()
@@ -218,7 +218,31 @@ class ReactTest(unittest.TestCase):
 
     def test_match_var_any_precedence(self):
         """
-        
+        Should match in order: static > var > any-var
         """
         self.routes._max_depth = 10
 
+        self.routes.add(':var1/:*path/:var2', 'foo')
+        self.routes.add('static1/:*path/static2', 'bar')
+        self.routes.add(':var1/:*path/static2', 'baz')
+        self.routes.add('static2/:var1/:*path/:var2/:*path2', 'qux')
+
+        # Never matches, since foo takes precedence
+        self.routes.add(':*path/:var1/:*path2', 'bad')
+
+        route = self.routes.match('foo/bar/baz/qux')
+        self.assertDictEqual(route.params, {'path': ('bar', 'baz'), 'var2': 'qux', 'var1': 'foo'})
+        self.assertEqual(route.anything, 'foo')
+
+        route = self.routes.match('static1/bar/baz/static2')
+        self.assertDictEqual(route.params, {'path': ('bar', 'baz')})
+        self.assertEqual(route.anything, 'bar')
+
+        route = self.routes.match('foo/bar/baz/static2')
+        self.assertDictEqual(route.params, {'var1': 'foo', 'path': ('bar', 'baz')})
+        self.assertEqual(route.anything, 'baz')
+
+        route = self.routes.match('static2/foo/bar/baz/qux')
+        self.assertDictEqual(route.params, {
+            'var1': 'foo', 'path': ('bar',), 'var2': 'baz', 'path2': ('qux',)})
+        self.assertEqual(route.anything, 'qux')
