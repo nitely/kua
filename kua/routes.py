@@ -5,7 +5,9 @@ from typing import (
     Tuple,
     List,
     Sequence,
-    Any)
+    Any,
+    Dict,
+    Union)
 
 
 __all__ = [
@@ -21,26 +23,24 @@ class RouteError(Exception):
     """Base error for any exception raised by Kua"""
 
 
-def depth_of(parts: Sequence[str]):
+def depth_of(parts: Sequence[str]) -> int:
     """
     Calculate the depth of URL parts
 
-    :param list parts: A list of URL parts
+    :param parts: A list of URL parts
     :return: Depth of the list
-    :rtype: int
 
     :private:
     """
     return len(parts) - 1
 
 
-def normalize_url(url: str):
+def normalize_url(url: str) -> str:
     """
     Remove leading and trailing slashes from a URL
 
-    :param str url: URL
+    :param url: URL
     :return: URL with no leading and trailing slashes
-    :rtype: str
 
     :private:
     """
@@ -79,18 +79,19 @@ def _unwrap(variable_parts: VariablePartsType):
         yield tuple(reversed(var_any))
 
 
-def make_params(key_parts: Sequence[str], variable_parts: VariablePartsType):
+def make_params(
+        key_parts: Sequence[str],
+        variable_parts: VariablePartsType) -> Dict[str, Union[str, Tuple[str]]]:
     """
     Map keys to variables. This map\
     URL-pattern variables to\
     a URL related parts
 
-    :param tuple key_parts: A list of URL parts
-    :param tuple variable_parts: A linked-list\
+    :param key_parts: A list of URL parts
+    :param variable_parts: A linked-list\
     (ala nested tuples) of URL parts
     :return: The param dict with the values\
     assigned to the keys
-    :rtype: dict
 
     :private:
     """
@@ -157,13 +158,18 @@ class Routes:
             # Do something useful here
             pass
 
+    :ivar max_depth: The maximum URL depth\
+    (number of parts) willing to match. This only\
+    takes effect when one or more URLs matcher\
+    make use of any-var (i.e: ``:*var``), otherwise the\
+    depth of the deepest URL is taken.
     """
 
     _VAR_NODE = ':var'
     _VAR_ANY_NODE = ':*var'
     _ROUTE_NODE = ':route'
 
-    def __init__(self, depth_limit: int=40):
+    def __init__(self, max_depth: int=40) -> None:
         """
         :ivar _routes: \
         Contain a graph with the parts of\
@@ -176,7 +182,7 @@ class Routes:
 
         :private-vars:
         """
-        self._depth_limit = depth_limit
+        self._max_depth_custom = max_depth
         # Routes graph format for 'foo/:foobar/bar':
         # {
         #   'foo': {
@@ -194,13 +200,12 @@ class Routes:
         self._routes = {}
         self._max_depth = 0
 
-    def _deconstruct_url(self, url: str):
+    def _deconstruct_url(self, url: str) -> List[str]:
         """
         Split a regular URL into parts
 
-        :param str url: A normalized URL
+        :param url: A normalized URL
         :return: Parts of the URL
-        :rtype: list
         :raises kua.routes.RouteError: \
         If the depth of the URL exceeds\
         the max depth of the deepest\
@@ -215,16 +220,15 @@ class Routes:
 
         return parts
 
-    def _match(self, parts: Sequence[str]):
+    def _match(self, parts: Sequence[str]) -> RouteResolved:
         """
         Match URL parts to a registered pattern.
 
         This function is basically where all\
         the CPU-heavy work is done.
 
-        :param list parts: URL parts
+        :param parts: URL parts
         :return: Matched route
-        :rtype: :py:class:`.RouteResolved`
         :raises kua.routes.RouteError: If there is no match
 
         :private:
@@ -285,20 +289,19 @@ class Routes:
                 variable_parts=route_variable_parts),
             anything=route_match.anything)
 
-    def match(self, url: str):
+    def match(self, url: str) -> RouteResolved:
         """
         Match a URL to a registered pattern.
 
-        :param str url: URL
+        :param url: URL
         :return: Matched route
-        :rtype: :py:class:`.RouteResolved`
         :raises kua.RouteError: If there is no match
         """
         url = normalize_url(url)
         parts = self._deconstruct_url(url)
         return self._match(parts)
 
-    def add(self, url: str, anything: Any):
+    def add(self, url: str, anything: Any) -> None:
         """
         Register a URL pattern into\
         the routes for later matching.
@@ -311,8 +314,8 @@ class Routes:
         Registration order does not matter.\
         Adding a URL first or last makes no difference.
 
-        :param str url: URL
-        :param object anything: Literally anything.
+        :param url: URL
+        :param anything: Literally anything.
         """
         url = normalize_url(url)
         parts = url.split('/')
@@ -323,6 +326,7 @@ class Routes:
             if part.startswith(':*'):
                 curr_key_parts.append(part[2:])
                 part = self._VAR_ANY_NODE
+                self._max_depth = self._max_depth_custom
 
             elif part.startswith(':'):
                 curr_key_parts.append(part[1:])
