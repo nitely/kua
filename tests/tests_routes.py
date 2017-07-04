@@ -9,7 +9,7 @@ from kua import routes
 logging.disable(logging.CRITICAL)
 
 
-class ReactTest(unittest.TestCase):
+class KuaTest(unittest.TestCase):
 
     def setUp(self):
         self.routes = routes.Routes()
@@ -62,7 +62,7 @@ class ReactTest(unittest.TestCase):
         self.assertEqual(anything, 'foo')
         self.assertEqual(anything_b, 'bar')
 
-    def test_match_clashing_backtraking(self):
+    def test_match_clashing_backtracking(self):
         """
         Should resolve clashing by doing backtracking
         """
@@ -82,7 +82,7 @@ class ReactTest(unittest.TestCase):
         self.assertEqual(anything, 'foo')
         self.assertEqual(anything_b, 'foo')
 
-    def test_match_clashing_backtraking_deeper(self):
+    def test_match_clashing_backtracking_deeper(self):
         """
         Should resolve clashing by doing backtracking
         """
@@ -175,3 +175,85 @@ class ReactTest(unittest.TestCase):
         route = self.routes.match('foo/bar/baz/')
         self.assertDictEqual(route.params, {})
         self.assertEqual(route.anything, 'foo')
+
+    def test_match_var_any(self):
+        """
+        Should match unknown number of URL parts
+        """
+        self.routes.add(':*path', 'foo')
+        self.routes.add('static/:*path', 'bar')
+        self.routes.add('static/:*path/sub-path', 'baz')
+        self.routes.add('static/:*path/sub-path/:file_name', 'qux')
+
+        route = self.routes.match('foo/bar/baz')
+        self.assertDictEqual(route.params, {'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'foo')
+
+        route = self.routes.match('static/foo/bar/baz')
+        self.assertDictEqual(route.params, {'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'bar')
+
+        route = self.routes.match('static/foo/bar/baz/sub-path')
+        self.assertDictEqual(route.params, {'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'baz')
+
+        route = self.routes.match('static/foo/bar/baz/sub-path/catz.jpg')
+        self.assertDictEqual(route.params, {
+            'file_name': 'catz.jpg',
+            'path': ('foo', 'bar', 'baz')})
+        self.assertEqual(route.anything, 'qux')
+
+    def test_match_var_any_many(self):
+        """
+        Should match multiple any vars
+        """
+        self.routes.add(':*path/:*path_a/:*patch_b', 'foo')
+        route = self.routes.match('foo/bar/baz/qux')
+        self.assertDictEqual(route.params, {
+            'patch_b': ('baz', 'qux'), 'path': ('foo',), 'path_a': ('bar',)})
+        self.assertEqual(route.anything, 'foo')
+
+    def test_match_var_any_precedence(self):
+        """
+        Should match in order: static > var > any-var
+        """
+        self.routes.add(':var1/:*path/:var2', 'foo')
+        self.routes.add('static1/:*path/static2', 'bar')
+        self.routes.add(':var1/:*path/static2', 'baz')
+        self.routes.add('static2/:var1/:*path/:var2/:*path2', 'qux')
+
+        # Never matches, since foo takes precedence
+        self.routes.add(':*path/:var1/:*path2', 'bad')
+
+        route = self.routes.match('foo/bar/baz/qux')
+        self.assertDictEqual(route.params, {'path': ('bar', 'baz'), 'var2': 'qux', 'var1': 'foo'})
+        self.assertEqual(route.anything, 'foo')
+
+        route = self.routes.match('static1/bar/baz/static2')
+        self.assertDictEqual(route.params, {'path': ('bar', 'baz')})
+        self.assertEqual(route.anything, 'bar')
+
+        route = self.routes.match('foo/bar/baz/static2')
+        self.assertDictEqual(route.params, {'var1': 'foo', 'path': ('bar', 'baz')})
+        self.assertEqual(route.anything, 'baz')
+
+        route = self.routes.match('static2/foo/bar/baz/qux')
+        self.assertDictEqual(route.params, {
+            'var1': 'foo', 'path': ('bar',), 'var2': 'baz', 'path2': ('qux',)})
+        self.assertEqual(route.anything, 'qux')
+
+    def test_max_depth(self):
+        """
+        Should not match on max_depth < url length
+        """
+        rts = routes.Routes(max_depth=3)
+        rts.add(':*path', 'foo')
+        self.assertEqual(rts.match('foo/bar/baz').anything, 'foo')
+
+        rts = routes.Routes(max_depth=1)
+        rts.add(':*path', 'foo')
+        self.assertRaises(routes.RouteError, rts.match, 'foo/bar/baz')
+
+        # Changes max_depth
+        rts.add(':var/bar/baz', 'bar')
+        self.assertEqual(rts.match('foo/bar/baz').anything, 'bar')
