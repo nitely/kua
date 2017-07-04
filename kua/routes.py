@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import collections
+from typing import (
+    Tuple,
+    List,
+    Sequence,
+    Any)
 
 
 __all__ = [
@@ -8,12 +13,15 @@ __all__ = [
     'Routes',
     'RouteResolved']
 
+# This is a nested structure similar to a linked-list
+VariablePartsType = Tuple[tuple, Tuple[str, str]]
+
 
 class RouteError(Exception):
     """Base error for any exception raised by Kua"""
 
 
-def depth_of(parts):
+def depth_of(parts: Sequence[str]):
     """
     Calculate the depth of URL parts
 
@@ -26,7 +34,7 @@ def depth_of(parts):
     return len(parts) - 1
 
 
-def normalize_url(url):
+def normalize_url(url: str):
     """
     Remove leading and trailing slashes from a URL
 
@@ -45,7 +53,7 @@ def normalize_url(url):
     return url
 
 
-def _unwrap(variable_parts):
+def _unwrap(variable_parts: VariablePartsType):
     """
     Yield URL parts. The given parts are usually in reverse order.
     """
@@ -61,7 +69,9 @@ def _unwrap(variable_parts):
 
         if var_any:
             yield tuple(reversed(var_any))
+            yield part
             var_any.clear()
+            continue
 
         yield part
 
@@ -69,7 +79,7 @@ def _unwrap(variable_parts):
         yield tuple(reversed(var_any))
 
 
-def make_params(key_parts, variable_parts):
+def make_params(key_parts: Sequence[str], variable_parts: VariablePartsType):
     """
     Map keys to variables. This map\
     URL-pattern variables to\
@@ -153,7 +163,7 @@ class Routes:
     _VAR_ANY_NODE = ':*var'
     _ROUTE_NODE = ':route'
 
-    def __init__(self):
+    def __init__(self, depth_limit: int=40):
         """
         :ivar _routes: \
         Contain a graph with the parts of\
@@ -166,6 +176,7 @@ class Routes:
 
         :private-vars:
         """
+        self._depth_limit = depth_limit
         # Routes graph format for 'foo/:foobar/bar':
         # {
         #   'foo': {
@@ -183,7 +194,7 @@ class Routes:
         self._routes = {}
         self._max_depth = 0
 
-    def _deconstruct_url(self, url):
+    def _deconstruct_url(self, url: str):
         """
         Split a regular URL into parts
 
@@ -204,7 +215,7 @@ class Routes:
 
         return parts
 
-    def _match(self, parts):
+    def _match(self, parts: Sequence[str]):
         """
         Match URL parts to a registered pattern.
 
@@ -218,9 +229,10 @@ class Routes:
 
         :private:
         """
-        route_match = None
-        route_variable_parts = tuple()
-        to_visit = [(self._routes, tuple(), 0)]  # (route_partial, variable_parts, depth)
+        route_match = None  # type: RouteResolved
+        route_variable_parts = tuple()  # type: VariablePartsType
+        # (route_partial, variable_parts, depth)
+        to_visit = [(self._routes, tuple(), 0)]  # type: List[Tuple[dict, tuple, int]]
 
         # Walk through the graph,
         # keep track of all possible
@@ -273,7 +285,7 @@ class Routes:
                 variable_parts=route_variable_parts),
             anything=route_match.anything)
 
-    def match(self, url):
+    def match(self, url: str):
         """
         Match a URL to a registered pattern.
 
@@ -286,7 +298,7 @@ class Routes:
         parts = self._deconstruct_url(url)
         return self._match(parts)
 
-    def add(self, url, anything):
+    def add(self, url: str, anything: Any):
         """
         Register a URL pattern into\
         the routes for later matching.
