@@ -17,6 +17,10 @@ def is_alphanum(var):
     return var.isalnum()
 
 
+def is_each(func):
+    return lambda vars_: all(func(var) for var in vars_)
+
+
 class KuaTest(unittest.TestCase):
 
     def setUp(self):
@@ -307,9 +311,6 @@ class KuaTest(unittest.TestCase):
         """
         Should validate any-vars
         """
-        def is_each(func):
-            return lambda vars_: all(func(var) for var in vars_)
-
         self.routes.add(':*var', 'foo', {'var': is_each(is_int)})
 
         route = self.routes.match('123/456/789')
@@ -328,3 +329,23 @@ class KuaTest(unittest.TestCase):
             routes.RouteError, self.routes.add, 'static/foo', 'foo', {'bad': is_int})
         self.assertRaises(
             routes.RouteError, self.routes.add, ':*var', 'foo', {'bad': is_int})
+
+    def test_var_validate_backtracking(self):
+        """
+        Should backtrack when not valid
+        """
+        self.routes.add(':var', 'foo', {'var': is_int})
+        self.routes.add(':*var', 'bar')
+
+        self.routes.add(':var/:var2', 'baz', {'var': is_int})
+        self.routes.add(':var/:*var', 'qux')
+
+        self.routes.add('static/:var/:var2', 'quux', {'var': is_int})
+        self.routes.add(':var/:var2/:var3', 'quuz')
+
+        self.assertEqual(self.routes.match('123').anything, 'foo')
+        self.assertEqual(self.routes.match('foo123').anything, 'bar')
+        self.assertEqual(self.routes.match('123/foo').anything, 'baz')
+        self.assertEqual(self.routes.match('foo/bar').anything, 'qux')
+        self.assertEqual(self.routes.match('static/123/123').anything, 'quux')
+        self.assertEqual(self.routes.match('static/foo/foo').anything, 'quuz')
