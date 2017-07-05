@@ -201,7 +201,7 @@ class Routes:
 
         # Typed vars
         is_num = lambda part: part.isdigit()
-        self.routes.add('api/user/:id', {'GET': my_get_controller}, {'id': is_num})
+        routes.add('api/user/:id', {'GET': my_get_controller}, {'id': is_num})
         route = routes.match('api/user/123')
         route.params
         # {'id': '123'}
