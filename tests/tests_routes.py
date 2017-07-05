@@ -9,6 +9,14 @@ from kua import routes
 logging.disable(logging.CRITICAL)
 
 
+def is_int(var):
+    return var.isdigit()
+
+
+def is_alphanum(var):
+    return var.isalnum()
+
+
 class KuaTest(unittest.TestCase):
 
     def setUp(self):
@@ -262,9 +270,6 @@ class KuaTest(unittest.TestCase):
         """
         Should validate a var
         """
-        def is_int(var):
-            return var.isdigit()
-
         self.routes.add(':var', 'foo', {'var': is_int})
 
         route = self.routes.match('123')
@@ -277,12 +282,6 @@ class KuaTest(unittest.TestCase):
         """
         Should validate a many vars
         """
-        def is_alphanum(var):
-            return var.isalnum()
-
-        def is_int(var):
-            return var.isdigit()
-
         self.routes.add(':var/:var2/:var3', 'foo', {'var': is_int, 'var2': is_alphanum})
 
         route = self.routes.match('123/foo123/bar123---')
@@ -296,12 +295,6 @@ class KuaTest(unittest.TestCase):
         """
         Should validate clashing vars
         """
-        def is_alphanum(var):
-            return var.isalnum()
-
-        def is_int(var):
-            return var.isdigit()
-
         # todo: support clashing urls!
 
         self.routes.add(':var', 'foo', {'var': is_int})
@@ -317,9 +310,6 @@ class KuaTest(unittest.TestCase):
         def is_each(func):
             return lambda vars_: all(func(var) for var in vars_)
 
-        def is_int(var):
-            return var.isdigit()
-
         self.routes.add(':*var', 'foo', {'var': is_each(is_int)})
 
         route = self.routes.match('123/456/789')
@@ -332,9 +322,6 @@ class KuaTest(unittest.TestCase):
         """
         Should raise an error when validate params don't match pattern params
         """
-        def is_int(var):
-            return var.isdigit()
-
         self.assertRaises(
             routes.RouteError, self.routes.add, ':var', 'foo', {'bad': is_int})
         self.assertRaises(
