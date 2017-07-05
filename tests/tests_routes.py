@@ -257,3 +257,87 @@ class KuaTest(unittest.TestCase):
         # Changes max_depth
         rts.add(':var/bar/baz', 'bar')
         self.assertEqual(rts.match('foo/bar/baz').anything, 'bar')
+
+    def test_var_validate(self):
+        """
+        Should validate a var
+        """
+        def is_int(var):
+            return var.isdigit()
+
+        self.routes.add(':var', 'foo', {'var': is_int})
+
+        route = self.routes.match('123')
+        self.assertDictEqual(route.params, {'var': '123'})
+        self.assertEqual(route.anything, 'foo')
+
+        self.assertRaises(routes.RouteError, self.routes.match, 'foo')
+
+    def test_var_validate_many(self):
+        """
+        Should validate a many vars
+        """
+        def is_alphanum(var):
+            return var.isalnum()
+
+        def is_int(var):
+            return var.isdigit()
+
+        self.routes.add(':var/:var2/:var3', 'foo', {'var': is_int, 'var2': is_alphanum})
+
+        route = self.routes.match('123/foo123/bar123---')
+        self.assertDictEqual(route.params, {'var3': 'bar123---', 'var': '123', 'var2': 'foo123'})
+        self.assertEqual(route.anything, 'foo')
+
+        self.assertRaises(routes.RouteError, self.routes.match, 'foo/foo123/bar')
+        self.assertRaises(routes.RouteError, self.routes.match, '123/foo123---/bar')
+
+    def test_var_validate_clashing(self):
+        """
+        Should validate clashing vars
+        """
+        def is_alphanum(var):
+            return var.isalnum()
+
+        def is_int(var):
+            return var.isdigit()
+
+        # todo: support clashing urls!
+
+        self.routes.add(':var', 'foo', {'var': is_int})
+        self.routes.add(':var', 'bar', {'var': is_alphanum})
+
+        self.assertEqual(self.routes.match('123').anything, 'bar')  # fixme: should == foo
+        self.assertEqual(self.routes.match('foo123').anything, 'bar')
+
+    def test_any_var_validate(self):
+        """
+        Should validate any-vars
+        """
+        def is_each(func):
+            return lambda vars_: all(func(var) for var in vars_)
+
+        def is_int(var):
+            return var.isdigit()
+
+        self.routes.add(':*var', 'foo', {'var': is_each(is_int)})
+
+        route = self.routes.match('123/456/789')
+        self.assertDictEqual(route.params, {'var': ('123', '456', '789')})
+        self.assertEqual(route.anything, 'foo')
+
+        self.assertRaises(routes.RouteError, self.routes.match, 'foo/bar')
+
+    def test_add_bad_validate_params(self):
+        """
+        Should raise an error when validate params don't match pattern params
+        """
+        def is_int(var):
+            return var.isdigit()
+
+        self.assertRaises(
+            routes.RouteError, self.routes.add, ':var', 'foo', {'bad': is_int})
+        self.assertRaises(
+            routes.RouteError, self.routes.add, 'static/foo', 'foo', {'bad': is_int})
+        self.assertRaises(
+            routes.RouteError, self.routes.add, ':*var', 'foo', {'bad': is_int})
