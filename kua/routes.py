@@ -10,7 +10,8 @@ from typing import (
     Any,
     Dict,
     Union,
-    Callable)
+    Callable,
+    Iterator)
 
 
 __all__ = [
@@ -19,7 +20,9 @@ __all__ = [
     'RouteResolved']
 
 # This is a nested structure similar to a linked-list
-VariablePartsType = Tuple[tuple, Tuple[str, str]]
+WrappedVariablePartsType = Tuple[tuple, Tuple[str, str]]
+VariablePartsType = Tuple[Union[str, Tuple[str]]]
+VariablePartsIterType = Iterator[Union[str, Tuple[str]]]
 ValidateType = Dict[str, Callable[[str], bool]]
 
 
@@ -75,7 +78,7 @@ def decode_parts(parts):
         raise DecodeRouteError('Can\'t decode the URL')
 
 
-def _unwrap(variable_parts: VariablePartsType):
+def _unwrap(variable_parts: WrappedVariablePartsType) -> VariablePartsIterType:
     """
     Yield URL parts. The given parts are usually in reverse order.
     """
@@ -109,44 +112,45 @@ def _unwrap(variable_parts: VariablePartsType):
         yield tuple(reversed(var_any))
 
 
+def unwrap(variable_parts: WrappedVariablePartsType) -> VariablePartsType:
+    return tuple(reversed(tuple(_unwrap(variable_parts))))
+
+
 def make_params(
         key_parts: Sequence[str],
-        variable_parts: VariablePartsType) -> Dict[str, Union[str, Tuple[str]]]:
+        variable_parts: VariablePartsIterType) -> Dict[str, Union[str, Tuple[str]]]:
     """
     Map keys to variables. This map\
     URL-pattern variables to\
     a URL related parts
 
     :param key_parts: A list of URL parts
-    :param variable_parts: A linked-list\
-    (ala nested tuples) of URL parts
+    :param variable_parts: A list of URL parts
     :return: The param dict with the values\
     assigned to the keys
 
     :private:
     """
-    # The unwrapped variable parts are in reverse order.
-    # Instead of reversing those we reverse the key parts
-    # and avoid the O(n) space required for reversing the vars
-    return dict(zip(reversed(key_parts), _unwrap(variable_parts)))
+    return dict(zip(key_parts, variable_parts))
 
 
 _SAFE_COMPONENT = re.compile(r'[ \w\-_.]+')
 
 
-def _is_safe(part):
+def _is_safe(part: str) -> bool:
     if isinstance(part, tuple):  # /:*parts/
-        return all(
-            _SAFE_COMPONENT.fullmatch(v)
-            for v in part)
+        return all(_is_safe(p) for p in part)
 
     return _SAFE_COMPONENT.fullmatch(part) is not None
 
 
-def validate(params: dict, params_validate: dict):
+def validate(
+        key_parts: Sequence[str],
+        variable_parts: VariablePartsIterType,
+        params_validate: dict) -> bool:
     return all(
         params_validate.get(param, _is_safe)(value)
-        for param, value in params.items())
+        for param, value in zip(key_parts, variable_parts))
 
 
 _Route = collections.namedtuple(
@@ -192,6 +196,23 @@ RouteResolved.__doc__ = (
     This is attached to the URL pattern when\
     registering it
     """)
+
+
+def _resolve(
+        variable_parts: VariablePartsType,
+        routes: Sequence[_Route]) -> Union[RouteResolved, None]:
+    for route in routes:
+        if validate(
+                route.key_parts,
+                variable_parts,
+                route.validate):
+            return RouteResolved(
+                params=make_params(
+                    key_parts=route.key_parts,
+                    variable_parts=variable_parts),
+                anything=route.anything)
+
+    return None
 
 
 class Routes:
@@ -328,22 +349,14 @@ class Routes:
             try:
                 part = parts[depth]
             except IndexError:
-                if self._ROUTE_NODE not in curr:
+                route_resolved = _resolve(
+                    variable_parts=unwrap(curr_variable_parts),
+                    routes=curr.get(self._ROUTE_NODE, ()))
+
+                if not route_resolved:
                     continue
 
-                for route in curr[self._ROUTE_NODE]:  # todo: move elsewhere
-                    params = make_params(
-                        key_parts=route.key_parts,
-                        variable_parts=curr_variable_parts)
-
-                    if not validate(params, route.validate):
-                        continue
-
-                    return RouteResolved(
-                        params=params,
-                        anything=route.anything)
-                else:  # no-break
-                    continue
+                return route_resolved
 
             if self._VAR_ANY_NODE in curr:
                 to_visit.append((

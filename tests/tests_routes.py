@@ -303,7 +303,9 @@ class KuaTest(unittest.TestCase):
         self.routes.add(':var', 'bar', {'var': is_alphanum})
 
         self.assertEqual(self.routes.match('123').anything, 'foo')
+        self.assertEqual(self.routes.match('123').params, {'var': '123'})
         self.assertEqual(self.routes.match('foo123').anything, 'bar')
+        self.assertEqual(self.routes.match('foo123').params, {'var': 'foo123'})
 
     def test_any_var_validate(self):
         """
