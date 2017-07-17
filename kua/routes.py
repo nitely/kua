@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import re
 import urllib.parse
 import collections
 from typing import (
@@ -130,10 +131,22 @@ def make_params(
     return dict(zip(reversed(key_parts), _unwrap(variable_parts)))
 
 
+_SAFE_COMPONENT = re.compile(r'[ \w\-_.]+')
+
+
+def _is_safe(part):
+    if isinstance(part, tuple):  # /:*parts/
+        return all(
+            _SAFE_COMPONENT.fullmatch(v)
+            for v in part)
+
+    return _SAFE_COMPONENT.fullmatch(part) is not None
+
+
 def validate(params: dict, params_validate: dict):
     return all(
-        func_validate(params[param])
-        for param, func_validate in params_validate.items())
+        params_validate.get(param, _is_safe)(value)
+        for param, value in params.items())
 
 
 _Route = collections.namedtuple(
@@ -323,7 +336,6 @@ class Routes:
                         key_parts=route.key_parts,
                         variable_parts=curr_variable_parts)
 
-                    # todo: decode variables before validating
                     if not validate(params, route.validate):
                         continue
 
