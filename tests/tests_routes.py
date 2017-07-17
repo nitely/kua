@@ -347,3 +347,21 @@ class KuaTest(unittest.TestCase):
         self.assertEqual(self.routes.match('foo/bar').anything, 'qux')
         self.assertEqual(self.routes.match('static/123/123').anything, 'quux')
         self.assertEqual(self.routes.match('static/foo/foo').anything, 'quuz')
+
+    def test_I10L(self):
+        """
+        Should support I10L letters within components
+        """
+        self.routes.add('i10l/áéíóú/áéíóú', 'foo')
+        self.assertEqual(self.routes.match(
+            'i10l/%C3%A1%C3%A9%C3%AD%C3%B3%C3%BA/%C3%A1%C3%A9%C3%AD%C3%B3%C3%BA').anything, 'foo')
+
+    def test_treat_plus_as_plus(self):
+        """
+        Should treat plus signs as plus signs
+        """
+        self.routes.add('foo+bar', 'foo')
+        self.assertEqual(self.routes.match('foo+bar').anything, 'foo')
+
+        self.routes.add('á+á', 'bar')
+        self.assertEqual(self.routes.match('%C3%A1+%C3%A1').anything, 'bar')
