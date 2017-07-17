@@ -67,7 +67,7 @@ def normalize_url(url: str) -> str:
 def decode_parts(parts):
     try:
         return tuple(
-            urllib.parse.unquote_plus(
+            urllib.parse.unquote(
                 part, encoding='utf-8', errors='strict')
             for part in parts)
     except UnicodeDecodeError:
