@@ -318,17 +318,20 @@ class Routes:
                 if self._ROUTE_NODE not in curr:
                     continue
 
-                route_match = curr[self._ROUTE_NODE]
-                params = make_params(
-                    key_parts=route_match.key_parts,
-                    variable_parts=curr_variable_parts)
+                for route in curr[self._ROUTE_NODE]:  # todo: move elsewhere
+                    params = make_params(
+                        key_parts=route.key_parts,
+                        variable_parts=curr_variable_parts)
 
-                if not validate(params, route_match.validate):
+                    # todo: decode variables before validating
+                    if not validate(params, route.validate):
+                        continue
+
+                    return RouteResolved(
+                        params=params,
+                        anything=route.anything)
+                else:  # no-break
                     continue
-
-                return RouteResolved(
-                    params=params,
-                    anything=route_match.anything)
 
             if self._VAR_ANY_NODE in curr:
                 to_visit.append((
@@ -409,9 +412,11 @@ class Routes:
             curr_partial_routes = (
                 curr_partial_routes.setdefault(part, {}))
 
-        curr_partial_routes[self._ROUTE_NODE] = _route(
+        (curr_partial_routes
+         .setdefault(self._ROUTE_NODE, [])
+         .append(_route(
             key_parts=curr_key_parts,
             anything=anything,
-            validate=validate)
+            validate=validate)))
 
         self._max_depth = max(self._max_depth, depth_of(parts))

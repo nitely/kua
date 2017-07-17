@@ -299,12 +299,10 @@ class KuaTest(unittest.TestCase):
         """
         Should validate clashing vars
         """
-        # todo: support clashing urls!
-
         self.routes.add(':var', 'foo', {'var': is_int})
         self.routes.add(':var', 'bar', {'var': is_alphanum})
 
-        self.assertEqual(self.routes.match('123').anything, 'bar')  # fixme: should == foo
+        self.assertEqual(self.routes.match('123').anything, 'foo')
         self.assertEqual(self.routes.match('foo123').anything, 'bar')
 
     def test_any_var_validate(self):
