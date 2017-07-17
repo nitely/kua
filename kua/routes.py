@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import urllib.parse
 import collections
 from typing import (
     Tuple,
@@ -23,6 +24,14 @@ ValidateType = Dict[str, Callable[[str], bool]]
 
 class RouteError(Exception):
     """Base error for any exception raised by Kua"""
+
+
+class MatchRouteError(RouteError):
+    """No match found"""
+
+
+class DecodeRouteError(RouteError):
+    """Can't decode the URL"""
 
 
 def depth_of(parts: Sequence[str]) -> int:
@@ -53,6 +62,16 @@ def normalize_url(url: str) -> str:
         url = url[:-1]
 
     return url
+
+
+def decode_parts(parts):
+    try:
+        return tuple(
+            urllib.parse.unquote_plus(
+                part, encoding='utf-8', errors='strict')
+            for part in parts)
+    except UnicodeDecodeError:
+        raise DecodeRouteError('Can\'t decode the URL')
 
 
 def _unwrap(variable_parts: VariablePartsType):
@@ -238,7 +257,7 @@ class Routes:
         #   'foo': {
         #       ':var': {
         #           'bar': {
-        #               ':route': _Route(),
+        #               ':route': [_Route(), ...],
         #               ...
         #           },
         #           ...
@@ -266,7 +285,7 @@ class Routes:
         parts = url.split('/', self._max_depth + 1)
 
         if depth_of(parts) > self._max_depth:
-            raise RouteError('No match')
+            raise MatchRouteError('No match')
 
         return parts
 
@@ -336,7 +355,7 @@ class Routes:
                     curr_variable_parts,
                     depth + 1))
 
-        raise RouteError('No match')
+        raise MatchRouteError('No match')
 
     def match(self, url: str) -> RouteResolved:
         """
@@ -348,6 +367,10 @@ class Routes:
         """
         url = normalize_url(url)
         parts = self._deconstruct_url(url)
+
+        if '%' in url:
+            parts = decode_parts(parts)
+
         return self._match(parts)
 
     def add(self, url: str, anything: Any, validate: ValidateType=None) -> None:
@@ -383,8 +406,8 @@ class Routes:
                 curr_key_parts.append(part[1:])
                 part = self._VAR_NODE
 
-            curr_partial_routes = (curr_partial_routes
-                                   .setdefault(part, {}))
+            curr_partial_routes = (
+                curr_partial_routes.setdefault(part, {}))
 
         curr_partial_routes[self._ROUTE_NODE] = _route(
             key_parts=curr_key_parts,
