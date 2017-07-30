@@ -275,7 +275,7 @@ class Routes:
 
     _VAR_ANY_BREAK = ':*var:break'
 
-    def __init__(self, max_depth: int=40) -> None:
+    def __init__(self, max_depth: int=10) -> None:
         """
         :ivar _routes: \
         Contain a graph with the parts of\
