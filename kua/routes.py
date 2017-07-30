@@ -219,13 +219,12 @@ class Routes:
     """
     Route URLs to registered URL patterns.
 
-    Thread safety: adding routes is not thread-safe,\
-    it should be done on import time, everything else is.
+    Thread safety: every method has a doc note about this
 
     URL matcher supports ``:var`` for matching dynamic\
-    path parts and ``:*var`` for matching one or more parts.
+    path parts and ``:*var`` for matching multiple parts.
 
-    Path parts are matched in the following order: ``static > var > any-var``.
+    Path parts have precedence: ``static > var > *var``.
 
     Usage::
 
@@ -246,8 +245,12 @@ class Routes:
         # Error handling
         try:
             route = routes.match('bad-url/some')
+        except kua.MatchRouteError:
+            raise Exception('Not Found 404')
+        except kua.DecodeRouteError:
+            raise Exception('Bad Request 400')
         except kua.RouteError:
-            raise ValueError('Not found 404')
+            raise Exception('Internal Server Error 500')
         else:
             # Do something useful here
             pass
@@ -349,9 +352,12 @@ class Routes:
             try:
                 part = parts[depth]
             except IndexError:
+                if self._ROUTE_NODE not in curr:
+                    continue
+
                 route_resolved = _resolve(
                     variable_parts=unwrap(curr_variable_parts),
-                    routes=curr.get(self._ROUTE_NODE, ()))
+                    routes=curr[self._ROUTE_NODE])
 
                 if not route_resolved:
                     continue
@@ -389,6 +395,8 @@ class Routes:
         """
         Match a URL to a registered pattern.
 
+        This method is thread-safe.
+
         :param url: URL
         :return: Matched route
         :raises kua.RouteError: If there is no match
@@ -405,6 +413,9 @@ class Routes:
         """
         Register a URL pattern into\
         the routes for later matching.
+
+        This method is not thread-safe.\
+        It should be called on import time or with a lock.
 
         It's possible to attach any kind of\
         object to the pattern for later\
