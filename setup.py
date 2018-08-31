@@ -26,7 +26,7 @@ setup(
     author_email='ecastroborsani@gmail.com',
     long_description=README,
     url=URL,
-    packages=find_packages(exclude=[]),
+    packages=find_packages(exclude=['tests*', 'kua.tests*']),
     test_suite="runtests.start",
     zip_safe=False,
     include_package_data=True,
